@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 
+OSM_FILE = "data/india/dehradun-complete.osm"  # New extracted Dehradun map
+
 def parse_osm(osm_file):
     tree = ET.parse(osm_file)
     root = tree.getroot()

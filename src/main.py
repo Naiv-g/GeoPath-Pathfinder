@@ -4,6 +4,8 @@ from matplotlib.figure import Figure
 from src.map_loader import parse_osm
 from src.graph import Graph
 from src.algorithms import astar, gbfs, dijkstra
+from map_loader import parse_osm
+
 
 class PathfinderGUI:
     def __init__(self, master, osm_file):
@@ -104,3 +106,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = PathfinderGUI(root, "data/uttarakhand/dehradun.osm")
     root.mainloop()
+
+nodes, ways = parse_osm("data/india/dehradun-complete.osm")  # Updated path
