@@ -18,69 +18,49 @@ OSM_FILE = DATA_DIR / "dehradun.osm"
 # Add project root to Python path
 sys.path.append(str(BASE_DIR))
 
+# Import algorithms from the algorithms directory
+from algorithms.astar import astar
+from algorithms.dijkstra import dijkstra
+from algorithms.gbfs import gbfs
+
 class RoadGraph:
     def __init__(self):
         self.adj_list = defaultdict(dict)
-    
+        
     def add_edge(self, u, v, weight):
         self.adj_list[u][v] = weight
         self.adj_list[v][u] = weight  # Bidirectional
 
 def parse_osm(osm_path):
     """Parse OSM XML file and extract road network"""
-    tree = ET.parse(osm_path)
-    root = tree.getroot()
+    try:
+        tree = ET.parse(osm_path)
+        root = tree.getroot()
 
-    nodes = {}
-    ways = []
+        nodes = {}
+        ways = []
 
-    # Extract nodes
-    for node in root.findall('node'):
-        nodes[node.get('id')] = (
-            float(node.get('lon')),
-            float(node.get('lat'))
-        )
+        # Extract nodes
+        for node in root.findall('node'):
+            nodes[node.get('id')] = (
+                float(node.get('lon')),
+                float(node.get('lat'))
+            )
 
-    # Extract roads
-    for way in root.findall('way'):
-        if any(tag.get('k') == 'highway' for tag in way.findall('tag')):
-            road = []
-            for nd in way.findall('nd'):
-                node_id = nd.get('ref')
-                if node_id in nodes:
-                    road.append(nodes[node_id])
-            if len(road) > 1:
-                ways.append(road)
+        # Extract roads
+        for way in root.findall('way'):
+            if any(tag.get('k') == 'highway' for tag in way.findall('tag')):
+                road = []
+                for nd in way.findall('nd'):
+                    node_id = nd.get('ref')
+                    if node_id in nodes:
+                        road.append(nodes[node_id])
+                if len(road) > 1:
+                    ways.append(road)
 
-    return nodes, ways
-
-def astar(graph, start, end, heuristic):
-    open_heap = []
-    heapq.heappush(open_heap, (0, start))
-    came_from = {}
-    g_score = defaultdict(lambda: float('inf'))
-    g_score[start] = 0
-    
-    while open_heap:
-        current_cost, current = heapq.heappop(open_heap)
-        
-        if current == end:
-            path = []
-            while current in came_from:
-                path.append(current)
-                current = came_from[current]
-            path.append(start)
-            return path[::-1]
-        
-        for neighbor in graph[current]:
-            tentative_g = g_score[current] + graph[current][neighbor]
-            if tentative_g < g_score[neighbor]:
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g
-                f_score = tentative_g + heuristic(neighbor, end)
-                heapq.heappush(open_heap, (f_score, neighbor))
-    
-    return None
+        return nodes, ways
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse OSM file: {str(e)}")
 
 class PathfinderApp:
     def __init__(self, master):
@@ -94,17 +74,22 @@ class PathfinderApp:
             return
         
         # Initialize state
-        self.nodes, self.ways = parse_osm(OSM_FILE)
-        self.graph = RoadGraph()
-        self.build_graph()
-        self.start_node = None
-        self.end_node = None
-        self.current_path = None
-        
-        # Setup UI
-        self.create_widgets()
-        self.setup_map()
-        self.connect_events()
+        try:
+            self.nodes, self.ways = parse_osm(OSM_FILE)
+            self.graph = RoadGraph()
+            self.build_graph()
+            self.start_node = None
+            self.end_node = None
+            self.current_path = None
+            self.pan_start = None
+            
+            # Setup UI
+            self.create_widgets()
+            self.setup_map()
+            self.connect_events()
+        except Exception as e:
+            messagebox.showerror("Initialization Error", str(e))
+            self.master.destroy()
 
     def show_file_error(self):
         error_msg = (
@@ -146,61 +131,40 @@ class PathfinderApp:
         self.toolbar.update()
 
     def build_graph(self):
-    """Construct road network graph"""
+        """Construct road network graph"""
         for road in self.ways:
             for i in range(len(road)-1):
-             u = road[i]
-             v = road[i+1]
-            distance = sqrt((u[0]-v[0])**2 + (u[1]-v[1])**2)
-            self.graph.add_edge(u, v, distance)
-            self.graph.add_edge(v, u, distance)
-            
+                u = road[i]
+                v = road[i+1]
+                distance = sqrt((u[0]-v[0])**2 + (u[1]-v[1])**2)
+                self.graph.add_edge(u, v, distance)
+
     def setup_map(self):
         """Initialize map visualization"""
         self.ax.clear()
+        all_x = []
+        all_y = []
+        
         for road in self.ways:
             x = [p[0] for p in road]
             y = [p[1] for p in road]
             self.ax.plot(x, y, 'gray', linewidth=0.5, alpha=0.7)
+            all_x.extend(x)
+            all_y.extend(y)
+        
+        # Set initial view bounds
+        self.ax.set_xlim(min(all_x), max(all_x))
+        self.ax.set_ylim(min(all_y), max(all_y))
         self.ax.set_title("Dehradun Road Network")
         self.canvas.draw()
-
+    
     def connect_events(self):
         """Connect matplotlib events"""
         self.canvas.mpl_connect('button_press_event', self.on_map_click)
         self.canvas.mpl_connect('scroll_event', self.on_zoom)
+        self.canvas.mpl_connect('motion_notify_event', self.on_pan_move)
         self.canvas.mpl_connect('button_press_event', self.on_pan_start)
         self.canvas.mpl_connect('button_release_event', self.on_pan_end)
-        self.canvas.mpl_connect('motion_notify_event', self.on_pan_move)
-
-    def on_pan_start(self, event):
-        """Start panning with middle mouse button"""
-        if event.button == 2:  # Middle mouse button
-            self.pan_start = (event.x, event.y)
-
-    def on_pan_end(self, event):
-        """End panning"""
-        self.pan_start = None
-
-    def on_pan_move(self, event):
-        """Handle panning"""
-        if self.pan_start and event.inaxes:
-            dx = event.x - self.pan_start[0]
-            dy = event.y - self.pan_start[1]
-            self.ax.set_xlim(self.ax.get_xlim() - dx * 0.02)
-            self.ax.set_ylim(self.ax.get_ylim() + dy * 0.02)
-            self.canvas.draw()
-            self.pan_start = (event.x, event.y)
-
-    def on_zoom(self, event):
-        """Handle zoom with mouse wheel"""
-        if event.inaxes:
-            scale = 1.1 if event.button == 'up' else 0.9
-            self.ax.set_xlim(self.ax.get_xlim()[0] * scale, 
-                            self.ax.get_xlim()[1] * scale)
-            self.ax.set_ylim(self.ax.get_ylim()[0] * scale, 
-                            self.ax.get_ylim()[1] * scale)
-            self.canvas.draw()
 
     def set_start_mode(self):
         """Activate start point selection"""
@@ -234,6 +198,49 @@ class PathfinderApp:
         self.master.config(cursor="")
         self.selection_mode = None
 
+    def on_pan_start(self, event):
+        """Start panning with right mouse button"""
+        if event.button == 3:  # Right mouse button
+            self.pan_start = (event.x, event.y)
+
+    def on_pan_end(self, event):
+        """End panning"""
+        self.pan_start = None
+
+    def on_pan_move(self, event):
+        """Handle panning"""
+        if self.pan_start and event.inaxes:
+            dx = event.x - self.pan_start[0]
+            dy = event.y - self.pan_start[1]
+            
+            # Convert pixel coordinates to data coordinates
+            xlim = self.ax.get_xlim()
+            ylim = self.ax.get_ylim()
+            scale_x = (xlim[1] - xlim[0]) / self.figure.bbox.width
+            scale_y = (ylim[1] - ylim[0]) / self.figure.bbox.height
+            
+            self.ax.set_xlim(xlim[0] - dx * scale_x, xlim[1] - dx * scale_x)
+            self.ax.set_ylim(ylim[0] + dy * scale_y, ylim[1] + dy * scale_y)
+            self.canvas.draw()
+            self.pan_start = (event.x, event.y)
+
+    def on_zoom(self, event):
+        """Handle zoom with mouse wheel"""
+        if event.inaxes:
+            scale_factor = 1.1 if event.button == 'up' else 0.9
+            
+            # Get current limits
+            xlim = self.ax.get_xlim()
+            ylim = self.ax.get_ylim()
+            
+            # Calculate new limits centered on cursor
+            new_width = (xlim[1] - xlim[0]) * scale_factor
+            new_height = (ylim[1] - ylim[0]) * scale_factor
+            
+            self.ax.set_xlim(event.xdata - new_width/2, event.xdata + new_width/2)
+            self.ax.set_ylim(event.ydata - new_height/2, event.ydata + new_height/2)
+            self.canvas.draw()
+
     def find_path(self):
         """Calculate and display shortest path"""
         if not self.start_node or not self.end_node:
@@ -241,8 +248,17 @@ class PathfinderApp:
             return
 
         try:
+            algorithm = self.algorithm.get()
             heuristic = lambda a, b: sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
-            path = astar(self.graph.adj_list, self.start_node, self.end_node, heuristic)
+            
+            if algorithm == "A*":
+                path = astar(self.graph.adj_list, self.start_node, self.end_node, heuristic)
+            elif algorithm == "Dijkstra":
+                path, _ = dijkstra(self.graph.adj_list, self.start_node, self.end_node)
+            elif algorithm == "GBFS":
+                path = gbfs(self.graph.adj_list, self.start_node, self.end_node, heuristic)
+            else:
+                raise ValueError(f"Unknown algorithm selected: {algorithm}")
             
             if path:
                 self.draw_path(path)
@@ -279,8 +295,7 @@ class PathfinderApp:
 
     def reset_view(self):
         """Reset zoom to initial view"""
-        self.ax.autoscale()
-        self.canvas.draw()
+        self.setup_map()
 
 if __name__ == "__main__":
     root = tk.Tk()
