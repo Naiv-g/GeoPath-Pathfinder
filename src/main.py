@@ -134,11 +134,12 @@ class PathfinderApp:
         """Construct road network graph"""
         for road in self.ways:
             for i in range(len(road)-1):
-                u = road[i]
-                v = road[i+1]
-                distance = sqrt((u[0]-v[0])**2 + (u[1]-v[1])**2)
-                self.graph.add_edge(u, v, distance)
-
+             u = road[i]
+             v = road[i+1]
+            distance = sqrt((u[0]-v[0])**2 + (u[1]-v[1])**2)
+            self.graph.add_edge(u, v, distance)
+            self.graph.add_edge(v, u, distance)
+            
     def setup_map(self):
         """Initialize map visualization"""
         self.ax.clear()
