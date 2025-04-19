@@ -13,7 +13,7 @@ def dijkstra(graph, start, end):
             if node == end:
                 return path, cost
             
-            for neighbor, weight in graph.adj_list[node].items():
+            for neighbor, weight in graph[node].items():
                 if neighbor not in visited:
                     heapq.heappush(queue, (cost + weight, neighbor, path))
     

@@ -2,6 +2,7 @@
 data/india/india.osm.pbf
 data/india/north-india.osm.pbf
 *.pbf  # Optional: Exclude all .pbf files
+__pycache__/
 
 # But keep the smaller Dehradun extract
 !data/india/dehradun-complete.osm
