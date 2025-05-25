@@ -17,7 +17,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dehradun-pathfinder-secret")
 
 # Setup paths
-OSM_FILE = "attached_assets/dehradun.osm"
+OSM_FILE = r"attached_assets\dehradun.osm"
 
 # Global variables to store map data
 nodes = {}
