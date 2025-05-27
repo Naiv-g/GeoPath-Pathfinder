@@ -84,7 +84,6 @@ http://localhost:5000
 ```
 GeoPath-Pathfinder/
 ├── 📄 app.py                 # Main Flask application
-├── 📄 main.py                # Application entry point
 ├── 📁 algorithms/            # Pathfinding algorithms
 │   ├── 📄 astar.py          # A* implementation
 │   ├── 📄 dijkstra.py       # Dijkstra's implementation
